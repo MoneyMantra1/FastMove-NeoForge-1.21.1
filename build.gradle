@@ -1,0 +1,100 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    id 'net.neoforged.moddev' version '2.0.140'
+    id 'io.freefair.lombok' version '8.6'
+}
+
+version = project.mod_version
+group = project.mod_group_id
+
+base {
+    archivesName = "${project.mod_id}-${project.minecraft_version}"
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        name = "KosmX"
+        url = 'https://maven.kosmx.dev/'
+    }
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+neoForge {
+    version = project.neoforge_version
+
+    mods {
+        "${project.mod_id}" {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+configurations {
+    localRuntime
+    runtimeClasspath.extendsFrom localRuntime
+}
+
+dependencies {
+    implementation "dev.kosmx.player-anim:player-animation-lib-forge:${project.player_anim_version}"
+
+    // NeoForge already provides Mixin at runtime; keep the annotations available at compile time.
+    // Do not run the Sponge annotation processor here: in this NeoForge/moddev setup it only
+    // knows searge/notch mappings and fails on Mojmap-named injection targets.
+    compileOnly "org.spongepowered:mixin:0.8.5"
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.named('processResources', ProcessResources).configure {
+    var replaceProperties = [
+            minecraft_version: minecraft_version,
+            minecraft_version_range: minecraft_version_range,
+            neoforge_version: neoforge_version,
+            neoforge_version_range: neoforge_version_range,
+            loader_version_range: loader_version_range,
+            mod_id: mod_id,
+            mod_name: mod_name,
+            mod_license: mod_license,
+            mod_version: mod_version,
+            mod_authors: mod_authors,
+            mod_description: mod_description
+    ]
+
+    inputs.properties(replaceProperties)
+    filesMatching(['META-INF/neoforge.mods.toml', 'pack.mcmeta']) {
+        expand replaceProperties + [project: project]
+    }
+}
+
+jar {
+    manifest {
+        attributes([
+                'Specification-Title'     : mod_id,
+                'Specification-Vendor'    : mod_authors,
+                'Specification-Version'   : '1',
+                'Implementation-Title'    : project.name,
+                'Implementation-Version'  : project.version,
+                'Implementation-Vendor'   : mod_authors,
+                'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
+                'MixinConfigs'            : 'fastmove.mixins.json'
+        ])
+    }
+}
+
+publishing {
+    publications {
+        create('mavenJava', MavenPublication) {
+            from components.java
+        }
+    }
+    repositories {
+        maven {
+            url = layout.buildDirectory.dir('repo')
+        }
+    }
+}
